@@ -9,6 +9,13 @@
 --    profile + latest resume analysis + latest assessment result into ONE row.
 --    Open it in the Supabase table editor and use "Export CSV / Excel / JSON"
 --    to download every student's complete record in a single click.
+--
+-- Re-running this migration on a database that already ran 0003/0004/0006 must
+-- NOT touch the view: those migrations widened it (prn, feedback_*,
+-- assessment_attempted) and PostgreSQL refuses `create or replace view` when the
+-- new definition drops columns that the existing view has
+-- (ERROR 42P16: cannot drop columns from view). So the view is only created
+-- when it is not there yet — this migration is the one that introduces it.
 -- ============================================================================
 
 alter table public.profiles
@@ -17,60 +24,74 @@ alter table public.profiles
 comment on column public.profiles.ai_avatar is
   'Generated AI avatar config: { seed:number, style:"aura"|"emerald"|"sunset"|"cyber", version:number, generated_at:iso8601 }';
 
-create or replace view public.student_profiles_full
-with (security_invoker = on)   -- RLS of the underlying tables still applies
-as
-select
-  p.id                    as student_id,
-  p.email,
-  p.role,
-  p.full_name,
-  p.phone,
-  p.dob,
-  p.gender,
-  p.degree,
-  p.college,
-  p.institution_id,
-  p.graduation_year,
-  p.cgpa,
-  p.skills,
-  p.linkedin_url,
-  p.github_url,
-  p.ai_avatar,
-  p.created_at            as profile_created_at,
-  p.updated_at            as profile_updated_at,
-  -- latest resume analysis (one row per student)
-  r.id                    as resume_id,
-  r.storage_key           as resume_storage_key,
-  r.resume_score,
-  r.parsed                as resume_parsed,
-  r.feedback              as resume_feedback,
-  r.created_at            as resume_created_at,
-  -- latest assessment result (one row per student)
-  a.session_id            as assessment_session_id,
-  a.total                 as talent_score,
-  a.grade,
-  a.percentile,
-  a.scores                as assessment_scores,
-  a.ai_feedback           as assessment_ai_feedback,
-  a.verifiable_hash,
-  a.report_storage_key    as report_storage_key,
-  a.created_at            as assessment_created_at
-from public.profiles p
-left join lateral (
-  select ra.*
-  from public.resume_analyses ra
-  where ra.student_id = p.id
-  order by ra.created_at desc
-  limit 1
-) r on true
-left join lateral (
-  select ar.*
-  from public.assessment_results ar
-  where ar.student_id = p.id
-  order by ar.created_at desc
-  limit 1
-) a on true;
+do $$
+begin
+  if exists (
+    select 1
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'student_profiles_full'
+      and c.relkind = 'v'
+  ) then
+    return;   -- a later migration already owns a wider view; leave it alone
+  end if;
 
-comment on view public.student_profiles_full is
-  'One row per student: profile + latest resume analysis + latest assessment result. Use the Supabase table editor export (CSV/Excel/JSON) to download all data.';
+  create view public.student_profiles_full
+  with (security_invoker = on)   -- RLS of the underlying tables still applies
+  as
+  select
+    p.id                    as student_id,
+    p.email,
+    p.role,
+    p.full_name,
+    p.phone,
+    p.dob,
+    p.gender,
+    p.degree,
+    p.college,
+    p.institution_id,
+    p.graduation_year,
+    p.cgpa,
+    p.skills,
+    p.linkedin_url,
+    p.github_url,
+    p.ai_avatar,
+    p.created_at            as profile_created_at,
+    p.updated_at            as profile_updated_at,
+    -- latest resume analysis (one row per student)
+    r.id                    as resume_id,
+    r.storage_key           as resume_storage_key,
+    r.resume_score,
+    r.parsed                as resume_parsed,
+    r.feedback              as resume_feedback,
+    r.created_at            as resume_created_at,
+    -- latest assessment result (one row per student)
+    a.session_id            as assessment_session_id,
+    a.total                 as talent_score,
+    a.grade,
+    a.percentile,
+    a.scores                as assessment_scores,
+    a.ai_feedback           as assessment_ai_feedback,
+    a.verifiable_hash,
+    a.report_storage_key    as report_storage_key,
+    a.created_at            as assessment_created_at
+  from public.profiles p
+  left join lateral (
+    select ra.*
+    from public.resume_analyses ra
+    where ra.student_id = p.id
+    order by ra.created_at desc
+    limit 1
+  ) r on true
+  left join lateral (
+    select ar.*
+    from public.assessment_results ar
+    where ar.student_id = p.id
+    order by ar.created_at desc
+    limit 1
+  ) a on true;
+
+  comment on view public.student_profiles_full is
+    'One row per student: profile + latest resume analysis + latest assessment result. Use the Supabase table editor export (CSV/Excel/JSON) to download all data.';
+end $$;

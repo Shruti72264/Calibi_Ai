@@ -63,13 +63,38 @@ create policy feedback_select_own on public.feedback_submissions
 -- plain `select * from public.student_profiles_full` also carries it. The app
 -- does NOT depend on this — /admin joins feedback itself (so it works whether
 -- or not this migration has been applied) — but it keeps the SQL view useful
--- for manual exports. Skipped automatically when migration 0003 has not run.
+-- for manual exports. Skipped automatically when migration 0003 has not run,
+-- or when the view already has the canonical shape.
+--
+-- The rebuilt view uses the SAME column list as migration 0006 and
+-- supabase/schema.sql (assessment_attempted included), so whichever order the
+-- files are applied in, `student_profiles_full` converges on one 38-column
+-- shape instead of losing a column to the file that ran last.
 -- ============================================================================
 do $$
 begin
   if exists (
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'profiles' and column_name = 'prn'
+  )
+  -- Skip the rebuild when the view already has the canonical shape. Anything
+  -- narrower (an `assessment_attempted`-less view left behind by an earlier
+  -- copy of this migration) is rebuilt; anything already correct is left
+  -- alone, so a re-run neither churns the definition nor drops `admin_stats`.
+  -- Note that `create or replace view` is not an option here: PostgreSQL
+  -- rejects a replacement that drops columns the existing view has
+  -- (ERROR 42P16: cannot drop columns from view).
+  and not (
+    exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'student_profiles_full'
+        and column_name  = 'feedback_rating'
+    )
+    and exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'student_profiles_full'
+        and column_name  = 'assessment_attempted'
+    )
   ) then
     -- Cascade: fresh projects built from supabase/schema.sql already have the
     -- admin_stats view (migration 0006) depending on this one; cascade drops
@@ -113,6 +138,13 @@ begin
       a.verifiable_hash,
       a.report_storage_key    as report_storage_key,
       a.created_at            as assessment_created_at,
+      (a.session_id is not null
+        or exists (
+          select 1 from public.assessment_sessions s
+          where s.student_id = p.id
+            and (s.status in ('submitted', 'expired') or s.submitted_at is not null)
+        )
+      )                       as assessment_attempted,
       f.rating                as feedback_rating,
       f.message               as feedback_message,
       f.created_at            as feedback_created_at

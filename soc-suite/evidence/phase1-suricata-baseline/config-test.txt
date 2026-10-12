@@ -1,0 +1,31 @@
+# Suricata configuration test — operator-reported
+#
+# PROVENANCE: this is a faithful transcription of the operator's reported result
+# from the Phase 1 baselining session on the Kali sensor (Suricata 8.0.6).
+# It is NOT a fresh capture produced by this project, and it must be replaced by
+# your own terminal output before being quoted as primary evidence:
+#
+#     sudo suricata -T -c /etc/suricata/suricata.yaml 2>&1 | tee config-test.txt
+#
+# Reported outcome:
+#   * configuration validation completed successfully
+#   * engine + rule set: 52,987 rules loaded
+#   * failed rule loads: 0
+#
+# Why this matters for the project: a clean `-T` run is the pre-condition for
+# ever touching the sensor's mode. Starting an engine whose rules failed to load
+# gives false confidence — the sensor runs, sees nothing, and the dashboard
+# correctly shows zero alerts while the operator assumes coverage.
+#
+# Recorded by the operator: [date not recorded — add it when you re-run]
+
+Command:
+    sudo suricata -T -c /etc/suricata/suricata.yaml
+
+Result (reported):
+    [INFO] Loading rule file ...
+    [INFO] Configuration provided via tree with signatures
+    [INFO] Engine started in test-only mode
+    ...
+    52987 rules successfully loaded, 0 rules failed
+    Configuration provided was successfully loaded. Exiting.

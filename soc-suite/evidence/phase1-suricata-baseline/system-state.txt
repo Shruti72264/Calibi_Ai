@@ -1,0 +1,68 @@
+# Suricata system state at the last baselining check — operator-reported
+#
+# PROVENANCE: transcription of the operator's reported observation. Not a fresh
+# capture from this project. Re-run the commands below on the sensor and replace
+# this file with your own output before treating it as primary evidence:
+#
+#     { systemctl status suricata --no-pager;
+#       ls -l /var/log/suricata/;
+#       stat -c '%n %s bytes' /var/log/suricata/eve.json /var/log/suricata/fast.log;
+#     } 2>&1 | tee system-state.txt
+#
+# ---------------------------------------------------------------------------
+# ENVIRONMENT
+# ---------------------------------------------------------------------------
+  Platform            : Kali Linux (VMware Workstation guest)
+  Network interface   : eth0
+  Host address        : 192.168.61.129
+  Suricata version    : 8.0.6
+  Wireshark version   : 4.6.6
+  Custom rule file    : /etc/suricata/rules/local.rules
+  EVE log             : /var/log/suricata/eve.json
+
+# ---------------------------------------------------------------------------
+# SERVICE STATE AT LAST CHECK
+# ---------------------------------------------------------------------------
+  systemd unit `suricata` : INACTIVE
+  Note: reported as inactive. This is exactly why the dashboard shows zero live
+  events until the sensor is deliberately started — the platform reports the
+  sensor's real state instead of substituting sample data.
+
+# ---------------------------------------------------------------------------
+# LOG FILES AT LAST CHECK
+# ---------------------------------------------------------------------------
+  /var/log/suricata/eve.json          : exists, EMPTY (0 alerts written since the
+                                        last service start)
+  /var/log/suricata/fast.log          : exists, EMPTY
+
+# ---------------------------------------------------------------------------
+# WHERE THE REAL TEST EVIDENCE LIVES
+# ---------------------------------------------------------------------------
+  Rotated/compressed EVE logs contain the Phase 1 test events:
+      LOCAL IDS TEST                  (sid 1000001, action: allowed)
+      LOCAL IPS TEST - ICMP BLOCKED   (sid 1000002, action: blocked)
+  Source      : 192.168.61.129
+  Destination : 8.8.8.8
+  Protocol    : ICMP
+
+  These are HISTORICAL records — written at the recorded timestamps of the test
+  session. They are not current live events, and the dashboard labels them as
+  historical evidence for exactly that reason.
+
+# ---------------------------------------------------------------------------
+# IPS TEST PATH (recorded for reproducibility, NOT currently active)
+# ---------------------------------------------------------------------------
+  Mechanism used : NFQUEUE
+  Temporary rule : iptables OUTPUT, ICMP -> NFQUEUE --queue-num 0
+  Status         : the temporary iptables rule was REMOVED after the test.
+  Consequence    : sid 1000002's drop rule is loaded but currently has no queue
+                   to act on. It therefore cannot block anything right now, and
+                   the dashboard must not claim that it does.
+
+# ---------------------------------------------------------------------------
+# VERIFICATION COMMANDS (read-only — run these before enabling anything)
+# ---------------------------------------------------------------------------
+  sudo systemctl status suricata --no-pager
+  sudo suricata -T -c /etc/suricata/suricata.yaml
+  sudo iptables -L OUTPUT -n --line-numbers | head   # prove the test rule is gone
+  sudo zgrep -h 'LOCAL IPS TEST' /var/log/suricata/eve.json.*.gz | tail -3

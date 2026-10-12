@@ -18,3 +18,19 @@ calibiai_db.runtime.json
 # PM2 logs + health probe scratch file (see ecosystem.config.cjs, /api/health)
 logs/
 .health-probe
+
+# ---------------------------------------------------------------------------
+# SENTINEL SOC (soc-suite/) runtime + build artifacts.
+# Deliberately ignored: local virtualenvs, installed modules, the SQLite audit
+# database (per-analyst runtime state), rotated log captures and build output.
+# Tracked on purpose: .env.example, data/historical/*.json (evidence baseline),
+# data/cisco/network_evidence.json (the topology evidence pack).
+# ---------------------------------------------------------------------------
+soc-suite/backend/.venv/
+soc-suite/frontend/node_modules/
+soc-suite/frontend/dist/
+soc-suite/backend/data/audit/
+soc-suite/logs/
+soc-suite/**/*.pyc
+soc-suite/**/__pycache__/
+soc-suite/**/.pytest_cache/

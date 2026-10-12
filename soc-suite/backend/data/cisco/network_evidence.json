@@ -1,0 +1,307 @@
+{
+  "pack_version": "1.0.0",
+  "pack_id": "cisco-pt-headoffice-branch-v1",
+  "title": "Enterprise network - Head Office / Branch / Internet Edge",
+  "source_system": "Cisco Packet Tracer (network simulation)",
+  "generated_by": "Hand-built from the operator's verified CLI session and test log",
+  "generated_at": null,
+  "generated_at_note": "Fill this in with the date of your Packet Tracer evidence session. It is deliberately null rather than invented.",
+  "provenance_disclosure": "Every device, address and link below comes from the operator's own Packet Tracer configuration and CLI verification. Nothing here is measured from live hardware: Packet Tracer devices do not expose SSH/SNMP telemetry to this dashboard, and Packet Tracer's simulated packets are NOT visible to the Kali host's Wireshark or Suricata. Data class: SIMULATION EVIDENCE.",
+  "addressing_plan": [
+    { "segment": "Head Office - employee LAN", "cidr": "192.168.10.0/24", "note": "DHCP served by R1" },
+    { "segment": "Head Office - server LAN", "cidr": "192.168.20.0/24", "note": "Static addressing" },
+    { "segment": "Branch LAN", "cidr": "192.168.30.0/24", "note": "Learned by R1 over OSPF" },
+    { "segment": "R1 - ASA transit", "cidr": "10.0.0.0/30", "note": "Routed link" },
+    { "segment": "ASA - ISP transit (public)", "cidr": "203.0.113.0/30", "note": "DOC-5737 style test range" },
+    { "segment": "Simulated Internet", "cidr": "203.0.114.0/24", "note": "Internet-facing segment of the ISP router" },
+    { "segment": "Head Office - Branch WAN", "cidr": "10.10.10.0/30", "note": "Serial link, verified up/up" }
+  ],
+  "sites": [
+    { "id": "head-office", "name": "Head Office", "role": "Primary site - employee + server LANs" },
+    { "id": "branch-office", "name": "Branch Office", "role": "Remote site - routed to Head Office over serial WAN and OSPF" },
+    { "id": "internet-edge", "name": "Internet Edge", "role": "ASA firewall, ISP router and simulated Internet server" }
+  ],
+  "devices": [
+    {
+      "id": "r1",
+      "name": "R1 (Head Office Edge Router)",
+      "kind": "router",
+      "site": "head-office",
+      "tier": "core",
+      "evidence_status": "verified",
+      "evidence_note": "OSPF adjacency, DHCP pool for 192.168.10.0/24, ACL BLOCK_PC0, NAT path to the ASA and the serial WAN are all recorded in the verified CLI session.",
+      "addresses": [
+        { "interface": "GigabitEthernet0/0", "ip": "192.168.10.1", "mask": "255.255.255.0", "role": "Employee LAN gateway" },
+        { "interface": "GigabitEthernet0/1", "ip": "192.168.20.1", "mask": "255.255.255.0", "role": "Server LAN gateway" },
+        { "interface": "GigabitEthernet0/2", "ip": "10.0.0.1", "mask": "255.255.255.252", "role": "Transit to ASA inside" },
+        { "interface": "Serial0/3/0", "ip": "10.10.10.1", "mask": "255.255.255.252", "role": "WAN to Branch R2 - verified up/up" }
+      ],
+      "services": ["OSPF", "DHCP server", "NAT/PAT (to ASA)", "ACL: BLOCK_PC0"],
+      "evidence_refs": ["EV-001", "EV-002", "EV-004", "EV-005", "EV-006"]
+    },
+    {
+      "id": "ho-switch",
+      "name": "Head Office Access Switch",
+      "kind": "switch",
+      "site": "head-office",
+      "tier": "access",
+      "evidence_status": "simulated",
+      "evidence_note": "Layer-2 device in the saved topology. No switch CLI capture was taken, so no per-port status is claimed.",
+      "addresses": [],
+      "services": ["Layer 2 switching"],
+      "evidence_refs": []
+    },
+    {
+      "id": "pc1",
+      "name": "PC1 (Head Office employee)",
+      "kind": "client",
+      "site": "head-office",
+      "tier": "endpoint",
+      "evidence_status": "verified",
+      "evidence_note": "Static address 192.168.10.11 observed in the topology and used in reachability tests.",
+      "addresses": [
+        { "interface": "NIC", "ip": "192.168.10.11", "mask": "255.255.255.0", "role": "Employee workstation", "gateway": "192.168.10.1" }
+      ],
+      "services": ["HTTP/HTTPS client", "DNS client"],
+      "evidence_refs": ["EV-003", "EV-004"]
+    },
+    {
+      "id": "pc0",
+      "name": "PC0 (Head Office employee)",
+      "kind": "client",
+      "site": "head-office",
+      "tier": "endpoint",
+      "evidence_status": "verified",
+      "evidence_note": "192.168.10.13 is the address explicitly denied by the router ACL BLOCK_PC0, which proves both the address and the policy.",
+      "addresses": [
+        { "interface": "NIC", "ip": "192.168.10.13", "mask": "255.255.255.0", "role": "Employee workstation (ACL-restricted)", "gateway": "192.168.10.1" }
+      ],
+      "services": ["HTTP/HTTPS client (blocked to 203.0.114.10 by ACL BLOCK_PC0)"],
+      "evidence_refs": ["EV-004", "EV-005"]
+    },
+    {
+      "id": "web-dns-server",
+      "name": "Internal Web / DNS Server",
+      "kind": "server",
+      "site": "head-office",
+      "tier": "server",
+      "evidence_status": "verified",
+      "evidence_note": "HTTP and HTTPS were served and tested successfully; the DNS record resolves www.securetech.local to this host.",
+      "addresses": [
+        { "interface": "NIC", "ip": "192.168.20.10", "mask": "255.255.255.0", "role": "Web + DNS", "gateway": "192.168.20.1" }
+      ],
+      "services": ["HTTP", "HTTPS", "DNS (www.securetech.local)"],
+      "evidence_refs": ["EV-003"]
+    },
+    {
+      "id": "r2",
+      "name": "R2 (Branch Router)",
+      "kind": "router",
+      "site": "branch-office",
+      "tier": "core",
+      "evidence_status": "verified",
+      "evidence_note": "OSPF adjacency with R1, the branch LAN on G0/0 and the shared employee LAN address on G0/1 were all part of the verified session.",
+      "addresses": [
+        { "interface": "GigabitEthernet0/0", "ip": "192.168.30.1", "mask": "255.255.255.0", "role": "Branch LAN gateway" },
+        { "interface": "GigabitEthernet0/1", "ip": "192.168.10.254", "mask": "255.255.255.0", "role": "Shared employee LAN (Head Office segment)" },
+        { "interface": "Serial0/3/0", "ip": "10.10.10.2", "mask": "255.255.255.252", "role": "WAN to Head Office R1 - verified up/up" }
+      ],
+      "services": ["OSPF", "Branch LAN routing"],
+      "evidence_refs": ["EV-001", "EV-006"]
+    },
+    {
+      "id": "branch-switch",
+      "name": "Branch Access Switch",
+      "kind": "switch",
+      "site": "branch-office",
+      "tier": "access",
+      "evidence_status": "simulated",
+      "evidence_note": "Layer-2 device in the saved topology; no CLI capture taken.",
+      "addresses": [],
+      "services": ["Layer 2 switching"],
+      "evidence_refs": []
+    },
+    {
+      "id": "pc3",
+      "name": "PC3 (Branch workstation)",
+      "kind": "client",
+      "site": "branch-office",
+      "tier": "endpoint",
+      "evidence_status": "verified",
+      "evidence_note": "Address recorded in the branch addressing plan and reachable once OSPF advertised the branch prefix.",
+      "addresses": [
+        { "interface": "NIC", "ip": "192.168.30.10", "mask": "255.255.255.0", "role": "Branch workstation", "gateway": "192.168.30.1" }
+      ],
+      "services": ["ICMP/HTTP client"],
+      "evidence_refs": ["EV-001"]
+    },
+    {
+      "id": "asa",
+      "name": "ASA Firewall",
+      "kind": "firewall",
+      "site": "internet-edge",
+      "tier": "security",
+      "evidence_status": "verified",
+      "evidence_note": "NAT/PAT and the inside->outside / outside->inside tests were executed. The ASA is the policy boundary between the enterprise and the simulated Internet.",
+      "addresses": [
+        { "interface": "inside", "ip": "10.0.0.2", "mask": "255.255.255.252", "role": "Inside - towards R1" },
+        { "interface": "outside", "ip": "203.0.113.1", "mask": "255.255.255.252", "role": "Outside - towards ISP" }
+      ],
+      "services": ["NAT/PAT", "Stateful inspection", "Access policies"],
+      "evidence_refs": ["EV-004"]
+    },
+    {
+      "id": "isp-router",
+      "name": "ISP Router",
+      "kind": "router",
+      "site": "internet-edge",
+      "tier": "wan",
+      "evidence_status": "simulated",
+      "evidence_note": "Provides the simulated Internet edge. Its configuration is part of the saved topology; no CLI capture was archived for it.",
+      "addresses": [
+        { "interface": "GigabitEthernet0/0", "ip": "203.0.113.2", "mask": "255.255.255.252", "role": "Towards ASA outside" },
+        { "interface": "GigabitEthernet0/1", "ip": "203.0.114.1", "mask": "255.255.255.0", "role": "Simulated Internet segment" }
+      ],
+      "services": ["Edge routing", "Simulated Internet default route"],
+      "evidence_refs": ["EV-004"]
+    },
+    {
+      "id": "internet-server",
+      "name": "Internet Server (simulated)",
+      "kind": "server",
+      "site": "internet-edge",
+      "tier": "external",
+      "evidence_status": "verified",
+      "evidence_note": "Reachability to this host is the positive control for the ACL test: permitted clients succeed, PC0 fails while 203.0.114.10 stays reachable from elsewhere.",
+      "addresses": [
+        { "interface": "NIC", "ip": "203.0.114.10", "mask": "255.255.255.0", "role": "External service target", "gateway": "203.0.114.1" }
+      ],
+      "services": ["HTTP (simulated Internet service)"],
+      "evidence_refs": ["EV-004", "EV-005"]
+    }
+  ],
+  "links": [
+    { "id": "L1", "a": "r1", "b": "ho-switch", "medium": "copper", "status": "simulated", "addresses": ["192.168.10.1/24"], "evidence_note": "Access link for the employee LAN; no per-port status captured." },
+    { "id": "L2", "a": "ho-switch", "b": "pc1", "medium": "copper", "status": "simulated", "addresses": ["192.168.10.11/24"] },
+    { "id": "L3", "a": "ho-switch", "b": "pc0", "medium": "copper", "status": "simulated", "addresses": ["192.168.10.13/24"] },
+    { "id": "L4", "a": "ho-switch", "b": "r2", "medium": "copper", "status": "simulated", "addresses": ["192.168.10.254/24"], "evidence_note": "R2 G0/1 sits on the employee LAN segment." },
+    { "id": "L5", "a": "r1", "b": "web-dns-server", "medium": "copper", "status": "verified", "addresses": ["192.168.20.1/24", "192.168.20.10/24"], "evidence_note": "HTTP/HTTPS and DNS queries to this server succeeded in testing." },
+    { "id": "L6", "a": "r1", "b": "asa", "medium": "copper", "status": "verified", "addresses": ["10.0.0.1/30", "10.0.0.2/30"], "evidence_note": "Transit link used for the inside->outside NAT test." },
+    { "id": "L7", "a": "asa", "b": "isp-router", "medium": "copper", "status": "verified", "addresses": ["203.0.113.1/30", "203.0.113.2/30"], "evidence_note": "Outside segment; NAT translations and outside->inside restrictions were tested across it." },
+    { "id": "L8", "a": "isp-router", "b": "internet-server", "medium": "copper", "status": "verified", "addresses": ["203.0.114.1/24", "203.0.114.10/24"], "evidence_note": "Target host for the ACL positive/negative control test." },
+    { "id": "L9", "a": "r2", "b": "branch-switch", "medium": "copper", "status": "simulated", "addresses": ["192.168.30.1/24"] },
+    { "id": "L10", "a": "branch-switch", "b": "pc3", "medium": "copper", "status": "simulated", "addresses": ["192.168.30.10/24"] },
+    { "id": "L11", "a": "r1", "b": "r2", "medium": "serial", "status": "verified", "addresses": ["10.10.10.1/30", "10.10.10.2/30"], "evidence_note": "Serial0/3/0 on both routers verified up/up; OSPF adjacency formed across this link." }
+  ],
+  "evidence": [
+    {
+      "id": "EV-001",
+      "area": "routing",
+      "title": "OSPF adjacency and branch prefix learning",
+      "result": "PASS",
+      "verified_at": null,
+      "verified_at_note": "Date not recorded in the pasted evidence - fill in from your Packet Tracer change log.",
+      "source": "Packet Tracer CLI (show ip ospf neighbor / show ip route)",
+      "status": "verified",
+      "detail": "R1 and R2 formed an OSPF adjacency and R1 learned the Branch network 192.168.30.0/24 as an OSPF route. This proves the serial WAN is forwarding and that dynamic routing converges.",
+      "expected": "Branch prefix 192.168.30.0/24 present in R1's routing table as OSPF.",
+      "observed": "Adjacency verified; Branch network learned by R1."
+    },
+    {
+      "id": "EV-002",
+      "area": "dhcp",
+      "title": "DHCP address assignment for employee clients",
+      "result": "PASS",
+      "verified_at": null,
+      "verified_at_note": "Date not recorded - fill in from your change log.",
+      "source": "Packet Tracer CLI / client DHCP test",
+      "status": "verified",
+      "detail": "R1 serves DHCP to the 192.168.10.0/24 employee LAN and clients received leases from it.",
+      "expected": "Clients obtain addresses in 192.168.10.0/24 with gateway 192.168.10.1.",
+      "observed": "DHCP tested and working."
+    },
+    {
+      "id": "EV-003",
+      "area": "dns_http",
+      "title": "Internal DNS, HTTP and HTTPS service test",
+      "result": "PASS",
+      "verified_at": null,
+      "verified_at_note": "Date not recorded - fill in from your change log.",
+      "source": "Packet Tracer client browser + DNS lookup",
+      "status": "verified",
+      "detail": "www.securetech.local resolves to the internal server 192.168.20.10, and both HTTP and HTTPS were served and loaded from a client.",
+      "expected": "DNS resolves to 192.168.20.10; HTTP and HTTPS pages load.",
+      "observed": "Both name resolution and web access succeeded."
+    },
+    {
+      "id": "EV-004",
+      "area": "firewall_nat",
+      "title": "ASA NAT/PAT and inside-to-outside / outside-to-inside policy test",
+      "result": "PASS",
+      "verified_at": null,
+      "verified_at_note": "Date not recorded - fill in from your change log.",
+      "source": "ASA CLI (show nat / show xlate) + connectivity tests",
+      "status": "verified",
+      "detail": "Inside hosts are translated (PAT) to the ASA outside address and reach the simulated Internet server. Unsolicited outside-to-inside traffic is denied by policy.",
+      "expected": "Inside clients reach 203.0.114.10 via translation; outside-initiated access to inside hosts is refused.",
+      "observed": "Inside-to-outside connectivity and outside-to-inside restriction both verified."
+    },
+    {
+      "id": "EV-005",
+      "area": "acl",
+      "title": "Router ACL BLOCK_PC0 - targeted denial with intact positive control",
+      "result": "PASS",
+      "verified_at": null,
+      "verified_at_note": "Date not recorded - fill in from your change log.",
+      "source": "R1 CLI (show access-lists) + client test",
+      "status": "verified",
+      "detail": "ACL BLOCK_PC0 denies traffic from 192.168.10.13 (PC0) to the Internet server 203.0.114.10 while permitting other traffic. Other clients and other destinations were unaffected, which is the positive control that makes the negation meaningful.",
+      "command": "access-list BLOCK_PC0 deny ip host 192.168.10.13 host 203.0.114.10",
+      "expected": "PC0 cannot reach 203.0.114.10; all other flows still work.",
+      "observed": "PC0 blocked; other clients and destinations unaffected."
+    },
+    {
+      "id": "EV-006",
+      "area": "wan",
+      "title": "Head Office <-> Branch serial WAN link up/up",
+      "result": "PASS",
+      "verified_at": null,
+      "verified_at_note": "Date not recorded - fill in from your change log.",
+      "source": "R1/R2 CLI (show ip interface brief)",
+      "status": "verified",
+      "detail": "Serial0/3/0 on R1 (10.10.10.1/30) and R2 (10.10.10.2/30) was verified as up/up, carrying OSPF between the sites.",
+      "expected": "Both ends of the serial link line protocol up.",
+      "observed": "up/up on both routers."
+    },
+    {
+      "id": "EV-007",
+      "area": "vpn_limitation",
+      "title": "Site-to-site VPN - NOT COMPLETED (documented limitation)",
+      "result": "NOT COMPLETED",
+      "verified_at": null,
+      "source": "Operator note - Packet Tracer capability limits",
+      "status": "unavailable",
+      "detail": "A VPN build was attempted and abandoned because the available Packet Tracer device models/images do not support the required IPsec features (and the ASA image required for site-to-site IPsec was not usable in this version). This is stated as a limitation rather than filled in with a configuration that was never tested.",
+      "expected": "n/a",
+      "observed": "Not attempted further - simulator/feature limitation."
+    },
+    {
+      "id": "EV-008",
+      "area": "simulation_boundary",
+      "title": "Simulation boundary - Packet Tracer traffic is not visible to Suricata/Wireshark on Kali",
+      "result": "INFORMATIONAL",
+      "verified_at": null,
+      "source": "Architecture note",
+      "status": "verified",
+      "detail": "Packet Tracer executes an independent simulation. No capture interface exports its frames to the Kali host, so Suricata and Wireshark cannot see any traffic from this topology. Therefore: (a) network status data on this dashboard is SIMULATION EVIDENCE, labelled as such; (b) Suricata detections come from real traffic on the Kali/VMware path. Any claim of a bridge between the two would be false unless a capture bridge (e.g. a tap feeding a real interface) is actually built and verified.",
+      "expected": "n/a",
+      "observed": "Two independent evidence planes, deliberately kept separate."
+    }
+  ],
+  "live_collection": {
+    "supported_by_devices": false,
+    "reason": "Cisco Packet Tracer devices do not expose SSH/SNMP/Telnet management interfaces to external collectors. Live collection is only meaningful against real hardware or GNS3/CSR/CML images.",
+    "adapter_state": "not configured",
+    "enable_instructions": "Set SOC_CISCO_LIVE_ENABLED=true and SOC_CISCO_LIVE_HOSTS=<ip:port,...> only after confirming the target devices really accept read-only management connections. The adapter performs TCP reachability probing first and reports failures instead of synthesising data."
+  }
+}

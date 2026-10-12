@@ -1,0 +1,30 @@
+# SENTINEL SOC — Suricata local rules (sensor: Kali Linux, Suricata 8.0.6)
+#
+# Destination on the sensor: /etc/suricata/rules/local.rules
+#
+# PROVENANCE: this file reproduces the two custom rules from the operator's
+# baseline evidence folder (phase1-suricata-baseline). Replace it with a copy of
+# the real file from the sensor:
+#     sudo cp /etc/suricata/rules/local.rules ./local.rules
+#
+# Both rules are deliberately ICMP-only probes against a public resolver used as
+# an approved test target. Nothing here inspects or drops production traffic.
+
+# ---------------------------------------------------------------------------
+# sid 1000001 — DETECTION-ONLY (IDS)
+# Fires on any ICMP echo and records it. `alert` never drops a packet: it is
+# safe in every Suricata mode, including plain interface capture.
+# Expected EVE outcome: event_type "alert", alert.action "allowed".
+# ---------------------------------------------------------------------------
+alert icmp any any -> any any (msg:"LOCAL IDS TEST"; sid:1000001; rev:1;)
+
+# ---------------------------------------------------------------------------
+# sid 1000002 — BLOCKING (IPS)
+# A `drop` rule only has an effect when the packet traverses the NFQUEUE the
+# sensor is reading. Loading this rule while Suricata runs in IDS mode is
+# harmless (it will simply be reported as an alert), which is why the safe
+# procedure is: prove detection first, then place the packet path in the queue,
+# then test, then remove the queue rule immediately.
+# Expected EVE outcome: alert.action "blocked" (or an event_type "drop").
+# ---------------------------------------------------------------------------
+drop icmp any any -> 8.8.8.8 any (msg:"LOCAL IPS TEST - ICMP BLOCKED"; sid:1000002; rev:1;)
